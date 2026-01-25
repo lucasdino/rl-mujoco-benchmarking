@@ -35,6 +35,11 @@ class TrainParams:
     wandb_group:        str | None = None
     extra:              Dict[str, Any] | None = None
 
+@dataclass
+class SamplerConfig:
+    name:               str
+    args:               Dict[str, Any]
+
 
 # Config that encompasses all our configs used
 @dataclass
@@ -43,3 +48,4 @@ class TrainConfig:
     algo:               AlgoConfig
     networks:           NetworksConfig
     train:              TrainParams
+    sampler:            SamplerConfig

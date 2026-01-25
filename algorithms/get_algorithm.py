@@ -1,8 +1,9 @@
 from algorithms.sac import SoftActorCritic
-
+from algorithms.ddqn import DDQN
 
 ALGO_MAP = {
-    "sac": SoftActorCritic
+    "sac": SoftActorCritic,
+    "ddqn": DDQN
 }
 
 

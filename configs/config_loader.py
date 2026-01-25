@@ -8,6 +8,7 @@ from configs.config import (
     SingleNetworkConfig,
     NetworksConfig,
     TrainParams,
+    SamplerConfig,
 )
 
 
@@ -16,14 +17,19 @@ def load_yaml_config(path: str) -> TrainConfig:
         raw: Dict[str, Any] = yaml.safe_load(f)
 
     # Env / Algo
-    env_cfg = EnvConfig(**raw["env"])
+    raw_env: Dict[str, Any] = raw["env"]
+    env_cfg = EnvConfig(
+        name=str(raw_env["name"]),
+        num_envs=int(raw_env["num_envs"]),
+        max_episode_steps=None if raw_env.get("max_episode_steps") is None else int(raw_env.get("max_episode_steps")),
+    )
     raw_algo: Dict[str, Any] = raw["algo"]
     algo_cfg = AlgoConfig(
-        name=raw_algo["name"],
-        gamma=raw_algo["gamma"],
-        lr=raw_algo["lr"],
-        batch_size=raw_algo["batch_size"],
-        seed=raw_algo["seed"],
+        name=str(raw_algo["name"]),
+        gamma=float(raw_algo["gamma"]),
+        lr=float(raw_algo["lr"]),
+        batch_size=int(raw_algo["batch_size"]),
+        seed=int(raw_algo["seed"]),
         extra={
             k: v
             for k, v in raw_algo.items()
@@ -45,10 +51,10 @@ def load_yaml_config(path: str) -> TrainConfig:
     # Train params
     raw_tp: Dict[str, Any] = raw["train"]
     train_params = TrainParams(
-        total_env_steps=raw_tp["total_env_steps"],
-        eval_interval=raw_tp["eval_interval"],
-        wandb_project=raw_tp["wandb_project"],
-        wandb_group=raw_tp.get("wandb_group"),
+        total_env_steps=int(raw_tp["total_env_steps"]),
+        eval_interval=int(raw_tp["eval_interval"]),
+        wandb_project=str(raw_tp["wandb_project"]),
+        wandb_group=None if raw_tp.get("wandb_group") is None else str(raw_tp.get("wandb_group")),
         extra={
             k: v
             for k, v in raw_tp.items()
@@ -56,9 +62,20 @@ def load_yaml_config(path: str) -> TrainConfig:
         } or None,
     )
 
+    
+    # Sampler
+    raw_sampler: Dict[str, Any] = raw.get("sampler", {})
+    sampler_args = {k: v for k, v in raw_sampler.items() if k != "name"}
+    sampler_args["total_steps"] = int(train_params.total_env_steps)
+    sampler_cfg = SamplerConfig(
+        name=str(raw_sampler.get("name", "greedy")),
+        args=sampler_args,
+    )
+
     return TrainConfig(
         env=env_cfg,
         algo=algo_cfg,
         networks=networks,
         train=train_params,
+        sampler=sampler_cfg,
     )

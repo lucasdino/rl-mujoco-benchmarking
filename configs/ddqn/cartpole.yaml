@@ -5,13 +5,14 @@ env:
 
 
 algo:
-  name: sac
+  name: ddqn
   gamma: 0.99
   lr: 3e-4
-  batch_size: 256
+  batch_size: 64
   seed: 42
-  buffer_size: 10000
+  buffer_size: 5000
   warmup_buffer_size: 1000
+  overwrite_target_net_grad_updates: 100   # In terms of 'number grad updates', not samples seen 
 
 
 sampler:
@@ -36,30 +37,10 @@ networks:
       activations: [relu, relu, relu]
       bias: False
 
-  policy:
-    network_type: mlp
-    network_args:
-      hidden_dims: [64, 64]
-      activations: [relu, relu, relu]
-      bias: False
-
-  value_network:
-    network_type: mlp
-    network_args:
-      hidden_dims: [64, 64]
-      activations: [relu, relu, relu]
-      bias: False
-
-  target_value_network:
-    network_type: mlp
-    network_args:
-      hidden_dims: [64, 64]
-      activations: [relu, relu, relu]
-      bias: False
-
 
 train:
   total_env_steps: 50000
   eval_interval: 5000
+  eval_envs: 128
   wandb_project: rl-benchmarking
-  wandb_group: cartpole-v1_sac
+  wandb_group: cartpole-v1_ddqn

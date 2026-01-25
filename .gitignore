@@ -3,3 +3,5 @@ sandbox/
 # venvs / setup
 .venv/
 .python-version
+
+__pycache__/

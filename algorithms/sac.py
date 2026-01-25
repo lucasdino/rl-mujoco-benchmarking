@@ -66,6 +66,7 @@ class SoftActorCritic(BaseAlgorithm):
         self.networks['policy'].eval()
         with torch.no_grad():
             raw_logits = self.networks['policy'](obs)
+            
 
             # Need to compute probs for each action (do softmax)
             # Also for sampling this should be based on what it says in paper, probably ep greedy? Will need this as another param I can set in my config
