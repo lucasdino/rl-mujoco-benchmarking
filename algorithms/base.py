@@ -1,5 +1,6 @@
 from typing import Any
 from abc import ABC, abstractmethod
+import torch
 
 from dataclass.primitives import BatchedActionOutput, BatchedTransition
 
@@ -37,13 +38,16 @@ class BaseAlgorithm(ABC):
         """ Simple call to implement in training loop to see if ready to update (e.g., checks if buffer has enough samples / you've exceeded the number of warmup steps) """
         ...
 
-    @abstractmethod
     def save(self, path: str) -> None:
         """ Saves your class (e.g., parameters, cfg, etc.). """
-        ...
+        torch.save(self, path)
 
     @classmethod
-    @abstractmethod
-    def load(self, path: str, override_cfg: Any = None) -> "BaseAlgorithm":
+    def load(cls, path: str, override_cfg: Any = None) -> "BaseAlgorithm":
         """ Loads in an instance of this class that was saved down. """
-        ...
+        algo = torch.load(path, map_location="cpu", weights_only=False)
+        if cls is not BaseAlgorithm:
+            assert isinstance(algo, cls), f"Loaded algo type {type(algo)} does not match expected {cls}"
+        if override_cfg is not None:
+            algo.cfg = override_cfg
+        return algo

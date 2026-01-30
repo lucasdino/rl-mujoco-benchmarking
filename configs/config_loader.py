@@ -1,4 +1,5 @@
 import yaml
+import random
 from typing import Any, Dict
 
 from configs.config import (
@@ -9,6 +10,7 @@ from configs.config import (
     NetworksConfig,
     TrainParams,
     SamplerConfig,
+    InferenceConfig,
 )
 
 
@@ -16,14 +18,24 @@ def load_yaml_config(path: str) -> TrainConfig:
     with open(path, "r") as f:
         raw: Dict[str, Any] = yaml.safe_load(f)
 
-    # Env / Algo
+    # Env
     raw_env: Dict[str, Any] = raw["env"]
+    raw_env_args = raw_env.get("env_args", {})
     env_cfg = EnvConfig(
         name=str(raw_env["name"]),
         num_envs=int(raw_env["num_envs"]),
         max_episode_steps=None if raw_env.get("max_episode_steps") is None else int(raw_env.get("max_episode_steps")),
+        is_atari=bool(raw_env.get("is_atari", False)),
+        stack_stamples=int(raw_env.get("stack_stamples", 1)),
+        env_args=dict(raw_env_args),
     )
+
+    # Algo
     raw_algo: Dict[str, Any] = raw["algo"]
+    seed_value = raw_algo.get("seed")
+    if seed_value is None:
+        seed_value = random.randint(0, 2**32 - 1)
+    raw_algo["seed"] = seed_value
     algo_cfg = AlgoConfig(
         name=str(raw_algo["name"]),
         gamma=float(raw_algo["gamma"]),
@@ -31,12 +43,14 @@ def load_yaml_config(path: str) -> TrainConfig:
         lr_end=float(raw_algo["lr_end"]),
         lr_warmup_env_steps=int(raw_algo["lr_warmup_env_steps"]),
         update_every_steps=int(raw_algo["update_every_steps"]),
+        use_action_for_steps_train=int(raw_algo.get("use_action_for_steps_train", 1)),
+        use_action_for_steps_eval=int(raw_algo.get("use_action_for_steps_eval", 1)),
         batch_size=int(raw_algo["batch_size"]),
         seed=int(raw_algo["seed"]),
         extra={
             k: v
             for k, v in raw_algo.items()
-            if k not in {"name", "gamma", "lr", "lr_start", "lr_end", "lr_warmup_env_steps", "seed", "batch_size"}
+            if k not in {"name", "gamma", "lr", "lr_start", "lr_end", "lr_warmup_env_steps", "seed", "batch_size", "use_action_for_steps_train", "use_action_for_steps_eval"}
         } or {},
     )
 
@@ -63,12 +77,15 @@ def load_yaml_config(path: str) -> TrainConfig:
         wandb_project=str(raw_tp["wandb_project"]),
         wandb_group=None if raw_tp.get("wandb_group") is None else str(raw_tp.get("wandb_group")),
         wandb_run=None if raw_tp.get("wandb_run") is None else str(raw_tp.get("wandb_run")),
-        save_video_last_eval=bool(raw_tp.get("save_video_last_eval", True)),
+        save_video_at_end=bool(raw_tp.get("save_video_at_end", True)),
+        save_algo_at_end=bool(raw_tp.get("save_algo_at_end", True)),
         video_save_dir=str(raw_tp.get("video_save_dir", "saved_data/saved_videos")),
+        algo_save_dir=str(raw_tp.get("algo_save_dir", "saved_data/saved_algos")),
+        threshold_exit_training_on_eval_score=(None if raw_tp.get("threshold_exit_training_on_eval_score") is None else float(raw_tp.get("threshold_exit_training_on_eval_score"))),
         extra={
             k: v
             for k, v in raw_tp.items()
-            if k not in {"total_env_steps", "eval_interval", "log_interval", "logging_method", "console_log_train", "wandb_project", "wandb_group", "wandb_run", "save_video_last_eval", "video_save_dir"}
+            if k not in {"total_env_steps", "eval_interval", "log_interval", "logging_method", "console_log_train", "wandb_project", "wandb_group", "wandb_run", "save_video_at_end", "save_algo_at_end", "video_save_dir", "algo_save_dir", "threshold_exit_training_on_eval_score"}
         } or None,
     )
 
@@ -82,10 +99,20 @@ def load_yaml_config(path: str) -> TrainConfig:
         args=sampler_args,
     )
 
+
+    # Inference
+    raw_inference: Dict[str, Any] = raw.get("inference", {})
+    inference_cfg = InferenceConfig(
+        inference_only=bool(raw_inference.get("inference_only", False)),
+        override_cfg=bool(raw_inference.get("override_cfg", False)),
+        algo_path=str(raw_inference.get("algo_path", "")),
+    )
+
     return TrainConfig(
         env=env_cfg,
         algo=algo_cfg,
         networks=networks,
         train=train_params,
         sampler=sampler_cfg,
+        inference=inference_cfg,
     )

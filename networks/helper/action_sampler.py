@@ -55,12 +55,12 @@ class ActionSampler():
     # =====================================
     def _epsilon_scheduler(self):
         """
-        Use self.args.starting_epsilon, self.args.ending_epsilon, and self.args.warmup_steps, and self.args.total_steps to compute on the fly (return as float) our epilson for this current step (based on self.num_samples) 
+        Use self.args.starting_epsilon, self.args.ending_epsilon, and self.args.warmup_steps, and self.args.decay_until_step to compute on the fly (return as float) our epilson for this current step (based on self.num_samples) 
         """
         start = float(self.args.args["starting_epsilon"])
         end = float(self.args.args["ending_epsilon"])
         warmup = int(self.args.args["warmup_steps"])
-        total = int(self.args.args["total_steps"])
+        total = int(self.args.args["decay_until_step"])
 
         if self.num_samples <= warmup:
             return start

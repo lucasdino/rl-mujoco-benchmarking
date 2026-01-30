@@ -14,6 +14,9 @@ from typing import Callable, Optional, Tuple, List, Any
 import numpy as np
 import gymnasium as gym
 
+from trainer.helper.env_setup import make_vec_envs
+from configs.config import EnvConfig
+
 
 def _pad_to_hw(img: np.ndarray, H: int, W: int) -> np.ndarray:
     h, w = img.shape[:2]
@@ -42,6 +45,17 @@ def _normalize_frame(img: np.ndarray, pad: int = 2) -> np.ndarray:
     return img
 
 
+def _apply_done_overlay(img: np.ndarray, alpha: float = 0.5, gray: int = 128) -> np.ndarray:
+    """Overlay a gray shader on a frame to indicate completion."""
+    if img is None:
+        return img
+    if img.dtype != np.uint8:
+        img = np.clip(img * 255.0, 0, 255).astype(np.uint8)
+    overlay = np.full_like(img, gray, dtype=np.uint8)
+    blended = (img.astype(np.float32) * (1.0 - alpha) + overlay.astype(np.float32) * alpha)
+    return blended.astype(np.uint8)
+
+
 def tile_grid(imgs: List[np.ndarray], grid_hw: Tuple[int, int], pad: int = 2) -> np.ndarray:
     rows, cols = grid_hw
     expected = rows * cols
@@ -63,9 +77,7 @@ def tile_grid(imgs: List[np.ndarray], grid_hw: Tuple[int, int], pad: int = 2) ->
 
 def record_vec_grid_video(
     *,
-    env_id: str,
-    num_envs: int,
-    max_episode_steps: int,
+    env_cfg: EnvConfig,
     algo: Any,
     to_tensor_obs: Callable[[np.ndarray], Any],
     actions_to_env: Callable[[Any], np.ndarray],
@@ -82,16 +94,10 @@ def record_vec_grid_video(
     actions_to_env must convert action tensor -> numpy actions suitable for env.step
     """
     rows, cols = grid_hw
-    if rows * cols != num_envs:
-        raise ValueError(f"grid_hw={grid_hw} implies {rows*cols} tiles but num_envs={num_envs}")
+    if rows * cols != env_cfg.num_envs:
+        raise ValueError(f"grid_hw={grid_hw} implies {rows*cols} tiles but num_envs={env_cfg.num_envs}")
 
-    envs = gym.make_vec(
-        env_id,
-        num_envs=num_envs,
-        vectorization_mode=vectorization_mode,
-        max_episode_steps=max_episode_steps,
-        render_mode="rgb_array",
-    )
+    envs = make_vec_envs(env_cfg, vectorization_mode=vectorization_mode, render_mode="rgb_array")
 
     obs, _ = envs.reset(seed=seed)
 
@@ -111,11 +117,14 @@ def record_vec_grid_video(
                 f = frozen[i] if frozen[i] is not None else None
 
             if done[i] and frozen[i] is not None:
-                tiled_inputs.append(frozen[i])
+                tiled_inputs.append(_apply_done_overlay(frozen[i]))
             else:
                 if f is not None:
                     frozen[i] = f
-                    tiled_inputs.append(f)
+                    if done[i]:
+                        tiled_inputs.append(_apply_done_overlay(f))
+                    else:
+                        tiled_inputs.append(f)
                 else:
                     tiled_inputs.append(np.zeros((64, 64, 3), dtype=np.uint8))
 

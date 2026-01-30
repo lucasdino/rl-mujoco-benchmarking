@@ -4,13 +4,16 @@ from dataclass.primitives import BatchedTransition
 
 
 
-class ReplayBuffer():
-    def __init__(self, buffer_length: int):
+class PriorityExperienceReplay:
+    def __init__(self, buffer_length: int, epsilon: float = 1e-6):
         self.buffer_length = buffer_length
         self._cur_idx = 0
         self._full = False
         self._initialized = False
-        # NOTE: We instantiate our obs, act_action, etc. buffers upon seeing our first transition (to get shapes correct).
+        self._epsilon = float(epsilon)
+        self._priorities = torch.zeros(buffer_length)
+        self._max_priority = 1.0
+        self._last_indices = None
 
 
     # ===================================
@@ -36,6 +39,7 @@ class ReplayBuffer():
         self._info = None if transition.info is None else {
             key: self._allocate_buffer(val) for key, val in transition.info.items()
         }
+        self._priorities = self._priorities.to(transition.obs.device)
         self._initialized = True
 
 
@@ -64,15 +68,28 @@ class ReplayBuffer():
             for key, buf in self._info.items():
                 buf[indices] = transition.info[key].clone()
 
+        self._priorities[indices] = self._max_priority
+
         start_idx = self._cur_idx
         self._cur_idx = (start_idx + batch_size) % self.buffer_length
         if not self._full and (start_idx + batch_size) >= self.buffer_length:
             self._full = True
 
-    def sample(self, num_samples: int, device, beta: float = None):
+    def sample(self, num_samples: int, device, beta: float = 0.4):
         """ Samples desired num_samples and moves to device prior to return. """
         max_idx = self.buffer_length if self._full else self._cur_idx
-        indices = torch.randint(0, max_idx, (num_samples,))
+        if max_idx == 0:
+            raise ValueError("Cannot sample from an empty buffer")
+
+        priorities = self._priorities[:max_idx].clone()
+        priorities = priorities + self._epsilon
+        probs = priorities / priorities.sum()
+        indices = torch.multinomial(probs, num_samples, replacement=True)
+        self._last_indices = indices
+
+        # Importance sampling weights
+        weights = (max_idx * probs[indices]) ** (-beta)
+        weights = weights / weights.max()
 
         act_info = None if self._act_info is None else {
             key: buf[indices].to(device) for key, buf in self._act_info.items()
@@ -80,8 +97,6 @@ class ReplayBuffer():
         info = None if self._info is None else {
             key: buf[indices].to(device) for key, buf in self._info.items()
         }
-
-        weights = torch.ones(num_samples, device=device)
 
         return (
             self._obs[indices].to(device),
@@ -92,11 +107,20 @@ class ReplayBuffer():
             self._truncated[indices].to(device),
             act_info,
             info,
-            weights,
+            weights.to(device),
         )
 
-    def update(self, *args, **kwargs) -> None:
-        return None
+    def update(self, td_errors) -> None:
+        if self._last_indices is None:
+            raise ValueError("update called before sample")
+
+        td_tensor = torch.as_tensor(td_errors).detach().flatten()
+        if td_tensor.numel() != self._last_indices.numel():
+            raise ValueError("td_errors size must match last sampled batch")
+
+        new_priorities = td_tensor.abs().to(self._priorities.device) + self._epsilon
+        self._priorities[self._last_indices] = new_priorities
+        self._max_priority = max(self._max_priority, new_priorities.max().item())
 
     def __len__(self) -> int:
         return self.buffer_length if self._full else self._cur_idx

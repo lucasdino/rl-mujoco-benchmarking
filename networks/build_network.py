@@ -1,11 +1,13 @@
 from networks.mlp import MLP
+from networks.cnn import CNN
 
 from configs.config import SingleNetworkConfig
 
 
 
 NETWORK_MAPPING = {
-    "mlp": MLP
+    "mlp": MLP,
+    "cnn": CNN,
 }
 
 def build_network(cfg: SingleNetworkConfig, obs_space, act_space):

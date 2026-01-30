@@ -92,13 +92,15 @@ class SoftActorCritic(BaseAlgorithm):
     def ready_to_update(self) -> bool:
         return max(self.cfg.algo.extra.get("warmup_buffer_size", 0), self.cfg.algo.batch_size) >= len(self.replay_buffer)
 
+
+    # =================================
+    # Defined at the base level
+    # =================================
     def save(self, path: str) -> None:
-        # this should save all relevant parts to a pckl file.
-        # so should basically make it so we save this entire class and all things associated down
-        pass
+        return super().save(path)
 
     @classmethod
-    def load(self, path: str, override_cfg: Any = None) -> "SoftActorCritic":
-        # Should be able to load in a pckl file.
-        # override cfg should simply override our cfg
-        pass
+    def load(cls, path: str, override_cfg: Any = None) -> "SoftActorCritic":
+        algo = super().load(path, override_cfg)
+        assert isinstance(algo, SoftActorCritic), f"Loaded algo type {type(algo)} does not match expected {SoftActorCritic}"
+        return algo
