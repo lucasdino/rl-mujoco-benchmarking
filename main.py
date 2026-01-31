@@ -6,11 +6,11 @@ from dotenv import load_dotenv
 
 from configs.config_loader import load_yaml_config
 from trainer.trainer import Trainer
-from trainer.helper import start_plot_server, compute_and_save_aggregated_results
+from trainer.helper import start_plot_server, compute_and_save_aggregated_results, save_config_snapshot
 from trainer.helper.plot_server import LIVE_PLOTS_DIR, CFG_GREEN, COLOR_RESET
 
 
-
+# Can either point to a folder with .yamls or to specific .yaml files
 configs = [
     "configs/discrete_actions/ddqn/per_ablation",
     "configs/discrete_actions/ddqn/n_step_ablation",
@@ -20,7 +20,7 @@ configs = [
     # "configs/discrete_actions/ddqn/cartpole.yaml",
 ]
 
-START_PLOT_SERVER = True
+START_PLOT_SERVER = False
 PLOT_SERVER_GRACE_SECONDS = 5
 
 
@@ -75,15 +75,22 @@ def main():
             num_seeds = cfg.train.num_seeds
             seeds = generate_seeds(cfg.algo.seed, num_seeds)
             run_name = cfg.train.run_name if cfg.train.run_name else f"{cfg.env.name}_{cfg.algo.name}"
-            
-            print(f"{CFG_GREEN}{'='*120}\n# Training on Config: {config:<96} #\n# Seeds: {seeds} #\n{'='*120}{COLOR_RESET}\n")
+            run_info = {
+                "config_path": config,
+                "run_name": run_name,
+                "num_seeds": num_seeds,
+                "seeds": seeds,
+                "per_seed": [],
+            }
+            print(f"{CFG_GREEN}{'='*120}\n# Training on Config: {config:<96} #\n# Seeds: {str(seeds):<109} #\n{'='*120}{COLOR_RESET}")
             
             for seed_idx, seed in enumerate(seeds):
-                print(f"\n--- Seed {seed_idx + 1}/{num_seeds} (seed={seed}) ---\n")
+                print(f"\n\n{CFG_GREEN}--- Seed {seed_idx + 1}/{num_seeds} (seed={seed}) ---{COLOR_RESET}\n")
                 trainer = Trainer(cfg, seed=seed, seed_idx=seed_idx)
+                seed_start = time.time()
                 trainer.train()
 
-                print(f"\n--- Final Evaluation + Saving (Seed {seed_idx}) ---")
+                print(f"\n{CFG_GREEN}--- Final Evaluation + Saving (Seed #{seed_idx+1}/{num_seeds}) ---{COLOR_RESET}")
                 trainer.eval(save_video=cfg.train.save_video_at_end and seed_idx == num_seeds - 1)
                 if cfg.train.save_algo_at_end:
                     trainer.save_algo()
@@ -92,9 +99,19 @@ def main():
                     trainer.wandb_run.finish()
                 
                 trainer.close()
+                seed_seconds = time.time() - seed_start
+
+                run_info["per_seed"].append({
+                    "seed_idx": seed_idx,
+                    "seed": seed,
+                    "total_seconds": seed_seconds,
+                })
             
+            run_info["total_seconds"] = time.time() - start_time
+
             if cfg.train.save_result and num_seeds >= 1:
                 compute_and_save_aggregated_results(run_name, num_seeds)
+                save_config_snapshot(run_name, cfg, run_info)
                 if START_PLOT_SERVER and PLOT_SERVER_GRACE_SECONDS > 0:
                     print(f"\n[PlotServer] Waiting {PLOT_SERVER_GRACE_SECONDS}s for live update...\n")
                     time.sleep(PLOT_SERVER_GRACE_SECONDS)
