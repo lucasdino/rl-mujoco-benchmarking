@@ -91,8 +91,11 @@ def save_line_plot(name: str, category: str, smoothing: bool = True, smoothing_r
             if row.get(seed_col, ""):
                 steps.append(int(row["step"]))
                 values.append(float(row[seed_col]))
-                if has_std and row.get(std_col, ""):
-                    stds.append(float(row[std_col]))
+                if has_std:
+                    if row.get(std_col, ""):
+                        stds.append(float(row[std_col]))
+                    else:
+                        stds.append(np.nan)
         data_by_seed[seed_col] = (steps, values, stds if has_std else [])
 
     save_dir = os.path.join(LIVE_PLOTS_DIR, category)
@@ -108,16 +111,17 @@ def save_line_plot(name: str, category: str, smoothing: bool = True, smoothing_r
             smoothed = ema_smooth(values, smoothing_rate)
             plt.plot(steps, values, alpha=0.2, color=color, linewidth=0.5)
             plt.plot(steps, smoothed, color=color, linewidth=1.5, label=seed_col)
-            if stds:
-                smoothed_std = ema_smooth(stds, smoothing_rate)
+            if stds and len(stds) == len(values):
+                smoothed_std = ema_smooth([0.0 if np.isnan(s) else s for s in stds], smoothing_rate)
                 upper = [m + s for m, s in zip(smoothed, smoothed_std)]
                 lower = [m - s for m, s in zip(smoothed, smoothed_std)]
                 plt.fill_between(steps, lower, upper, alpha=0.15, color=color)
         else:
             plt.plot(steps, values, color=color, linewidth=1.0, label=seed_col)
-            if stds:
-                upper = [m + s for m, s in zip(values, stds)]
-                lower = [m - s for m, s in zip(values, stds)]
+            if stds and len(stds) == len(values):
+                std_vals = [0.0 if np.isnan(s) else s for s in stds]
+                upper = [m + s for m, s in zip(values, std_vals)]
+                lower = [m - s for m, s in zip(values, std_vals)]
                 plt.fill_between(steps, lower, upper, alpha=0.15, color=color)
     
     if len(data_by_seed) > 1:

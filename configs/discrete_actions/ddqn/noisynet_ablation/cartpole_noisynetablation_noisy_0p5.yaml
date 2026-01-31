@@ -11,12 +11,12 @@ algo:
   lr_end:   2e-4
   lr_warmup_env_steps: 20000
   batch_size: 32       # ddqn paper (pg. 9) uses B=32
-  n_step: 8            # n-step TD learning (1 = standard TD)
+  n_step: 4            # n-step TD learning (1 = standard TD)
   update_every_steps: 1
   use_action_for_steps_train: 1
   use_action_for_steps_eval: 1
-  seed: 21             # Comment out (Default to None) if you want random seeding
-  buffer_size: 100000    # ddqn paper (pg. 9) uses 1M for this but train on atari (200M frames)
+  seed: 21               # Comment out (Default to None) if you want random seeding
+  buffer_size: 200000    # ddqn paper (pg. 9) uses 1M for this but train on atari (200M frames)
   buffer_type: priority_experience_replay
   warmup_buffer_size: 5000
   overwrite_target_net_grad_updates: 256   # In terms of 'number grad updates', not samples seen. Num steps would be this * num_envs * update_every_steps
@@ -38,7 +38,7 @@ networks:
       mlp_activations: [relu, relu, identity]
       mlp_bias: True
       mlp_layer_type: [Linear, NoisyLinear, NoisyLinear]
-      mlp_layer_extra_args: [{}, {sigma0: 1.0}, {sigma0: 1.0}]
+      mlp_layer_extra_args: [{}, {sigma0: 0.5}, {sigma0: 0.5}]
 
   q_2:
     network_type: mlp
@@ -47,7 +47,7 @@ networks:
       mlp_activations: [relu, relu, identity]
       mlp_bias: True
       mlp_layer_type: [Linear, NoisyLinear, NoisyLinear]
-      mlp_layer_extra_args: [{}, {sigma0: 1.0}, {sigma0: 1.0}]
+      mlp_layer_extra_args: [{}, {sigma0: 0.5}, {sigma0: 0.5}]
 
 
 train:
@@ -55,12 +55,12 @@ train:
   log_interval: 20000
   eval_interval: 20000
   eval_envs: 64
-  threshold_exit_training_on_eval_score: 500
+  # threshold_exit_training_on_eval_score: 500
   logging_method: [console]
   console_log_train: True
   # wandb_project: set this in config.py
   wandb_group: cartpole_ddqn
-  run_name: cartpole_ddqn_v1
+  run_name: cartpole_ddqn_noisynetablation_noisynet_0p5
   num_seeds: 5
   save_result: True
   save_video_at_end: False

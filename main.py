@@ -12,11 +12,11 @@ from trainer.helper.plot_server import LIVE_PLOTS_DIR, CFG_GREEN, COLOR_RESET
 
 # Can either point to a folder with .yamls or to specific .yaml files
 configs = [
-    "configs/discrete_actions/ddqn/per_ablation",
-    "configs/discrete_actions/ddqn/n_step_ablation",
-    "configs/discrete_actions/ddqn/noisynet_ablation",
+    # "configs/discrete_actions/ddqn/per_ablation",
+    # "configs/discrete_actions/ddqn/n_step_ablation",
+    # "configs/discrete_actions/ddqn/noisynet_ablation",
     # "configs/discrete_actions/ddqn/breakout.yaml",
-    # "configs/discrete_actions/ddqn/lunarlander.yaml",
+    "configs/discrete_actions/ddqn/lunarlander.yaml",
     # "configs/discrete_actions/ddqn/cartpole.yaml",
 ]
 
