@@ -2,28 +2,25 @@ env:
   name: breakout
   is_atari: True
   num_envs: 32
-  max_episode_steps: 900   # 30 fps
+  max_episode_steps: 1000   # 30 fps
   stack_stamples: 4
-  # env_args:
-
-
 
 algo:
   name: ddqn
-  gamma: 0.99
+  gamma: 0.98
   lr_start: 2.5e-4       # ddqn paper (pg. 9) uses constant lr=0.00025
   lr_end:   2.5e-4
-  lr_warmup_env_steps: 5000
+  lr_warmup_env_steps: 100000
   batch_size: 32       # ddqn paper (pg. 9) uses B=32
-  n_step: 1            # n-step TD learning (1 = standard TD)
+  n_step: 8            # n-step TD learning (1 = standard TD)
   update_every_steps: 1
   use_action_for_steps_train: 1
   use_action_for_steps_eval: 1
-  # seed: 42             # Comment out (Default to None) if you want random seeding
-  buffer_size: 40000    # ddqn paper (pg. 9) uses 1M for this but train on atari (200M frames)
+  # seed: 21             # Comment out (Default to None) if you want random seeding
+  buffer_size: 20000    # ddqn paper (pg. 9) uses 1M for this but train on atari (200M frames)
   buffer_type: priority_experience_replay
   warmup_buffer_size: 5000
-  overwrite_target_net_grad_updates: 10000   # Update target net after this many SGD steps, not environment steps. Num env steps would be this * num_envs * update_every_steps
+  overwrite_target_net_grad_updates: 512   # Update target net after this many SGD steps, not environment steps. Num env steps would be this * num_envs * update_every_steps
 
 
 sampler:
@@ -31,7 +28,7 @@ sampler:
   starting_epsilon: 1.0
   ending_epsilon: 0.1
   warmup_steps: 0
-  decay_until_step: 1000000
+  decay_until_step: 2000000
 
 
 networks:
@@ -66,7 +63,7 @@ networks:
       mlp_layer_extra_args: [{}, {}]
 
 train:
-  total_env_steps: 1000000
+  total_env_steps: 5000000
   log_interval: 100000
   eval_interval: 100000
   eval_envs: 64
@@ -77,7 +74,7 @@ train:
   save_algo_at_end: True
   # wandb_project: set this in config.py
   wandb_group: breakout_ddqn
-  run_name: breakout_ddqn_exp1
+  run_name: breakout_ddqn_v1
   num_seeds: 1
   save_result: False
 

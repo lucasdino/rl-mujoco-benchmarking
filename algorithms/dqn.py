@@ -13,9 +13,9 @@ from configs.config import TrainConfig
 from trainer.helper import RunResults
 
 
-class DDQN(BaseAlgorithm):
+class DQN(BaseAlgorithm):
     def __init__(self, cfg: TrainConfig, obs_space, act_space, device):
-        """ Implementation of https://arxiv.org/pdf/1509.06461. """
+        """ Implementation of https://arxiv.org/pdf/1312.5602. """
         super().__init__(cfg=cfg, obs_space=obs_space, act_space=act_space, device=device)
         self._instantiate_buffer()
         self._instantiate_networks()
@@ -48,12 +48,13 @@ class DDQN(BaseAlgorithm):
         # Sending to GPU (if using GPU)
         for model in self.networks.values():
             model.to(self.device)
-        # Ensure we have the required nets for DDQN
+        # Ensure we have the required nets for DQN
         assert all([req_net in self.networks for req_net in ("q_1", "q_2")])
+        self.networks["q_2"].eval()   # always set to eval for this
 
     def _instantiate_optimizer(self):
         self.optimizers = {
-            name: optim.Adam(model.parameters(), lr=self.cfg.algo.lr_start) for name, model in self.networks.items()
+            name: optim.Adam(model.parameters(), lr=self.cfg.algo.lr_start) for name, model in self.networks.items() if name == "q_1"
         }
 
     def _instantiate_lr_schedulers(self):
@@ -88,6 +89,7 @@ class DDQN(BaseAlgorithm):
                 action_values = self.networks['q_1'](obs)
             actions = action_values.argmax(dim=1, keepdim=True)
         else:
+            self.networks['q_1'].train()
             with torch.no_grad():
                 action_values = self.networks['q_1'](obs)
             placeholder_action = torch.zeros((action_values.shape[0], 1), device=action_values.device, dtype=torch.long)
@@ -123,7 +125,6 @@ class DDQN(BaseAlgorithm):
         return observed_results
 
     def update(self) -> list[RunResults]:
-        self.networks['q_1'].train()
         # Will do this at first step then every 'overwrite_target_net_grad_updates' update calls
         if self.step_info["update_num"] % self.cfg.algo.extra["overwrite_target_net_grad_updates"] == 0:
             self._copy_q1_to_q2()
@@ -134,24 +135,19 @@ class DDQN(BaseAlgorithm):
         obs, actions, n_rewards, next_obs, terminated, truncated, act_info, info, weights, actual_n = self.replay_buffer.sample(
             self.cfg.algo.batch_size, self.device, n_step=n_step, gamma=gamma
         )
-        _ = [optimizer.zero_grad() for optimizer in self.optimizers.values()]
+        self.optimizers['q_1'].zero_grad()   # only doing updates on q_1
 
         actions = actions.long()
         n_rewards = n_rewards.float()
 
-        # Action selection a* = argmax_a Q_1(s', a)
+        # Bootstrap using your target net: max Q_2(s', a). This is what DDQN improves upon
         with torch.no_grad():
-            next_action_values = self.networks['q_1'](next_obs)                # B x C
-            greedy_actions = next_action_values.argmax(dim=1, keepdim=True)    # B x 1
-
-        # Action evaluation w/ Q_2 (target net) -- this is the 'Double' part of DDQN
-        with torch.no_grad():
-            next_action_values_target = self.networks['q_2'](next_obs)
-            action_values_target = next_action_values_target.gather(1, greedy_actions)        # B x 1
+            action_values_target = self.networks["q_2"](next_obs).max(dim=1, keepdim=True).values      # B x 1
 
         # Compute n-step bootstrapped values: R_n + gamma^n * Q(s_{t+n}, a*)
-        done = (terminated | truncated).float()
-        gamma_n = (gamma ** actual_n.float())  # [B x 1]
+        # done = (terminated | truncated).float()
+        done = terminated.float()
+        gamma_n = (gamma ** actual_n.float())  # B x 1
         target_values = n_rewards + gamma_n * (1.0 - done) * action_values_target   # B x 1
 
         # Optimize
@@ -160,16 +156,16 @@ class DDQN(BaseAlgorithm):
         td_errors = (target_values - q_taken).detach()
         per_sample = F.smooth_l1_loss(q_taken, target_values, reduction="none").squeeze(-1)
         loss = (weights * per_sample).mean()
-        self.replay_buffer.update(td_errors)   # need to make this call in case we're using PER (update for td residuals)
+        self.replay_buffer.update(td_errors)   # need to make this call in case we're using PER (update td residuals for priority)
         residual = td_errors.abs().flatten().tolist()
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.networks["q_1"].parameters(), max_norm=10.0)
         
         current_lr = self.lr_schedulers["q_1"].get_last_lr()
-        _ = [optimizer.step() for optimizer in self.optimizers.values()]
+        self.optimizers['q_1'].step()
         current_env_steps = int(self.step_info["rollout_steps"])
-        _ = [scheduler.step(current_env_steps) for scheduler in self.lr_schedulers.values()]
+        self.lr_schedulers['q_1'].step(current_env_steps)
 
         update_results = [
             RunResults("Loss", loss.mean().item(), "batched_mean", category="loss", write_to_file=True, smoothing=False, aggregation_steps=50),
@@ -191,9 +187,9 @@ class DDQN(BaseAlgorithm):
         return super().save(path)
 
     @classmethod
-    def load(cls, path: str, override_cfg: Any = None) -> "DDQN":
+    def load(cls, path: str, override_cfg: Any = None) -> "DQN":
         algo = super().load(path, override_cfg)
-        assert isinstance(algo, DDQN), f"Loaded algo type {type(algo)} does not match expected {DDQN}"
+        assert isinstance(algo, DQN), f"Loaded algo type {type(algo)} does not match expected {DQN}"
         return algo
 
     # =================================
@@ -202,6 +198,7 @@ class DDQN(BaseAlgorithm):
     def _copy_q1_to_q2(self):
         # Copy weights from q1 to q2
         self.networks["q_2"].load_state_dict(self.networks["q_1"].state_dict())
+        self.networks["q_2"].eval() # should always be in eval mode
 
     @staticmethod
     def _get_grad_magnitudes(model: torch.nn.Module, lr: float, eps: float = 1e-12) -> dict[str, float]:

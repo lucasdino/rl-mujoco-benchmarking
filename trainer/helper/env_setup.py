@@ -53,10 +53,9 @@ def make_atari_vec_envs(
     if max_episode_steps is not None:
         kwargs["max_num_frames_per_episode"] = max_episode_steps * 4  # account for frameskip
     
-    if render_mode is not None:
-        kwargs["render_mode"] = render_mode
-    
     envs = AtariVectorEnv(**kwargs)
+    if render_mode is not None and hasattr(envs, "render_mode"):
+        envs.render_mode = render_mode
     
     return envs
 

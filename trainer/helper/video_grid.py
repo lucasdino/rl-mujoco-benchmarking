@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Callable, Optional, Tuple, List, Any
 import numpy as np
 import gymnasium as gym
+from dataclasses import replace
 
 from trainer.helper.env_setup import make_vec_envs
 from configs.config import EnvConfig
@@ -93,10 +94,11 @@ def record_vec_grid_video(
     to_tensor_obs must convert numpy obs -> torch tensor on correct device/dtype
     actions_to_env must convert action tensor -> numpy actions suitable for env.step
     """
-    rows, cols = grid_hw
-    num_envs = env_cfg.num_envs
-    if rows * cols != env_cfg.num_envs:
-        raise ValueError(f"grid_hw={grid_hw} implies {rows*cols} tiles but num_envs={env_cfg.num_envs}")
+    fixed_num_envs = 16
+    fixed_grid_hw = (4, 4)
+    env_cfg = replace(env_cfg, num_envs=fixed_num_envs)
+    rows, cols = fixed_grid_hw
+    num_envs = fixed_num_envs
 
     envs = make_vec_envs(env_cfg, vectorization_mode=vectorization_mode, render_mode="rgb_array")
 

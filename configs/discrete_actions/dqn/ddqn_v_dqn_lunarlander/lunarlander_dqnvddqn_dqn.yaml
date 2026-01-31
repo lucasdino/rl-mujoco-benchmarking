@@ -23,11 +23,11 @@ algo:
 
 
 sampler:
-  name: greedy
-  # starting_epsilon: 1.0
-  # ending_epsilon: 0.05
-  # warmup_steps: 0
-  # decay_until_step: 800000
+  name: epsilon_greedy
+  starting_epsilon: 1.0
+  ending_epsilon: 0.1
+  warmup_steps: 0
+  decay_until_step: 800000
 
 
 networks:
@@ -37,8 +37,17 @@ networks:
       mlp_dims: ["InDims", 128, 128, "OutDims"]
       mlp_activations: [relu, relu, identity]
       mlp_bias: True
-      mlp_layer_type: [Linear, NoisyLinear, NoisyLinear]
-      mlp_layer_extra_args: [{}, {sigma0: 0.5}, {sigma0: 0.5}]
+      mlp_layer_type: [Linear, Linear, Linear]
+      mlp_layer_extra_args: [{}, {}, {}]
+
+  q_2:
+    network_type: mlp
+    network_args:
+      mlp_dims: ["InDims", 128, 128, "OutDims"]
+      mlp_activations: [relu, relu, identity]
+      mlp_bias: True
+      mlp_layer_type: [Linear, Linear, Linear]
+      mlp_layer_extra_args: [{}, {}, {}]
 
 
 train:
@@ -49,12 +58,12 @@ train:
   # threshold_exit_training_on_eval_score: 250
   logging_method: [console]
   console_log_train: True
-  save_video_at_end: False
-  save_algo_at_end: False
+  save_video_at_end: True
+  save_algo_at_end: True
   # wandb_project: set this in config.py
   wandb_group: lunarlander_dqn
-  run_name: lunarlander_dqn_v1
-  num_seeds: 1
+  run_name: lunarlander_dqnvddqn_dqn
+  num_seeds: 5
   save_result: False
 
 

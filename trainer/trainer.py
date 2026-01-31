@@ -153,15 +153,12 @@ class Trainer():
 
         # Optional: record ONE tiled grid video (one episode per env tile)
         if save_video:
-            grid_frames = []
-            side = int(round(num_envs ** 0.5))
-            assert side * side == num_envs, f"num_envs={num_envs} must be a perfect square for a square grid"
             grid_frames = record_vec_grid_video(
                 env_cfg=self.cfg.env,
                 algo=self.algo,
                 to_tensor_obs=self._to_tensor_obs,
                 actions_to_env=self._actions_to_env,
-                grid_hw=(side, side),
+                grid_hw=(4, 4),
                 seed=self.cfg.algo.seed + 10_000,
                 pad=2,
                 vectorization_mode="sync",

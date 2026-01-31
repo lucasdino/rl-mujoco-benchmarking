@@ -12,15 +12,19 @@ from trainer.helper.plot_server import LIVE_PLOTS_DIR, CFG_GREEN, COLOR_RESET
 
 # Can either point to a folder with .yamls or to specific .yaml files
 configs = [
+    # "configs/discrete_actions/dqn/cartpole.yaml"
+    "configs/discrete_actions/dqn/ddqn_v_dqn_cartpole",
+    "configs/discrete_actions/ddqn/noisynet_ablation",
+    "configs/discrete_actions/dqn/ddqn_v_dqn_lunarlander",
     # "configs/discrete_actions/ddqn/per_ablation",
     # "configs/discrete_actions/ddqn/n_step_ablation",
     # "configs/discrete_actions/ddqn/noisynet_ablation",
     # "configs/discrete_actions/ddqn/breakout.yaml",
-    "configs/discrete_actions/ddqn/lunarlander.yaml",
+    # "configs/discrete_actions/ddqn/lunarlander.yaml",
     # "configs/discrete_actions/ddqn/cartpole.yaml",
 ]
 
-START_PLOT_SERVER = False
+START_PLOT_SERVER = True
 PLOT_SERVER_GRACE_SECONDS = 5
 
 
@@ -35,18 +39,26 @@ def generate_seeds(base_seed: int | None, num_seeds: int) -> list[int]:
     return [random.randint(0, 2**31 - 1) for _ in range(num_seeds)]
 
 
-def main():
-    if os.path.exists(LIVE_PLOTS_DIR):
-        for entry in os.listdir(LIVE_PLOTS_DIR):
-            if entry == "index.html":
-                continue
-            path = os.path.join(LIVE_PLOTS_DIR, entry)
-            if os.path.isdir(path):
-                shutil.rmtree(path)
-            else:
-                os.remove(path)
-    else:
+def _clear_live_plots_dir() -> None:
+    """
+    Clear live plots directory.
+    return
+    """
+    if not os.path.exists(LIVE_PLOTS_DIR):
         os.makedirs(LIVE_PLOTS_DIR, exist_ok=True)
+        return
+    for entry in os.listdir(LIVE_PLOTS_DIR):
+        if entry == "index.html":
+            continue
+        path = os.path.join(LIVE_PLOTS_DIR, entry)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+
+
+def main():
+    os.makedirs(LIVE_PLOTS_DIR, exist_ok=True)
     if START_PLOT_SERVER:
         start_plot_server(open_browser=True)
     
@@ -54,6 +66,7 @@ def main():
     for c in configs:
         expanded_configs.extend([os.path.join(c, f) for f in os.listdir(c) if f.endswith(".yaml")]) if os.path.isdir(c) else expanded_configs.append(c)
     for config in expanded_configs:
+        _clear_live_plots_dir()
         start_time = time.time()
         cfg = load_yaml_config(config)
 
